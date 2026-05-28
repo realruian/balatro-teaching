@@ -11,7 +11,7 @@
             <input
               type="range" min="0" max="100"
               :value="settings.bgmVolume"
-              @input="e => $emit('update', { bgmVolume: +e.target.value })"
+              @input="onBgmInput"
               class="slider slider-blue"
             />
           </div>
@@ -22,7 +22,7 @@
             <input
               type="range" min="0" max="100"
               :value="settings.sfxVolume"
-              @input="e => $emit('update', { sfxVolume: +e.target.value })"
+              @input="onSfxInput"
               class="slider slider-orange"
             />
           </div>
@@ -61,14 +61,30 @@
 </template>
 
 <script setup>
+import { setBgmVolume, setSfxVolume } from '../utils/audio.js'
+
 defineProps({ settings: { type: Object, required: true } })
-defineEmits(['close', 'update'])
+const emit = defineEmits(['close', 'update'])
 
 const speedOpts = [
   { label: '慢', value: 'slow' },
   { label: '普通', value: 'normal' },
   { label: '快', value: 'fast' },
 ]
+
+// BGM 滑块实时接线（PRD §M4，@input 不是 @change）
+function onBgmInput(e) {
+  const v = Number(e.target.value)
+  emit('update', { bgmVolume: v })
+  setBgmVolume(v / 100)  // 实时更新 Howler/合成音量
+}
+
+// SFX 滑块实时接线
+function onSfxInput(e) {
+  const v = Number(e.target.value)
+  emit('update', { sfxVolume: v })
+  setSfxVolume(v / 100)  // 实时更新 Howler/合成音量
+}
 </script>
 
 <style scoped>

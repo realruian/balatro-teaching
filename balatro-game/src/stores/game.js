@@ -4,6 +4,7 @@
  */
 import { defineStore } from 'pinia'
 import { createDeck, shuffle, identifyHand, cardValue, applyJokers } from '../utils/poker.js'
+import { playSfx } from '../utils/audio.js'
 
 // 盲注定义（3 关）
 export const BLINDS = [
@@ -218,6 +219,8 @@ export const useGameStore = defineStore('game', {
         if (this.selectedCardIds.length >= 5) return
         this.selectedCardIds.push(id)
       }
+      // 每次点击手牌（选中或取消）都触发 card-select 音效（PRD §M3）
+      playSfx('card-select')
     },
 
     // 取消全选
@@ -275,18 +278,22 @@ export const useGameStore = defineStore('game', {
     checkBlindResult() {
       const blind = BLINDS[this.currentBlindIndex]
       if (this.blindScore >= blind.target) {
-        // 通关
+        // 通关：奖金到账播 coin 音效（PRD §M3）
         const reward = blind.reward + this.handsLeft
         this.coins += reward
-        // 最后一关直接 won
+        playSfx('coin')
+        // 最后一关直接 won，播胜利音效
         if (this.currentBlindIndex >= BLINDS.length - 1) {
           this.gameState = 'won'
+          playSfx('win')
         } else {
           this.enterShop()
         }
         return 'pass'
       } else if (this.handsLeft <= 0) {
+        // 失败：播 lose 音效（PRD §M3）
         this.gameState = 'lost'
+        playSfx('lose')
         return 'fail'
       }
       return 'continue'
@@ -312,6 +319,8 @@ export const useGameStore = defineStore('game', {
       this.coins -= joker.price
       this.ownedJokers.push(joker)
       this.soldJokerIds.push(jokerId)
+      // 购买扣金币时播 coin 音效（PRD §M3）
+      playSfx('coin')
       return 'ok'
     },
 

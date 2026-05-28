@@ -155,6 +155,7 @@ import { gsap } from 'gsap'
 import { useGameStore } from './stores/game.js'
 import { identifyHand, cardValue } from './utils/poker.js'
 import { findBestPlay } from './utils/ai.js'
+import { playSfx } from './utils/audio.js'
 import SideBar from './components/SideBar.vue'
 import JokerCard from './components/JokerCard.vue'
 import PokerCard from './components/PokerCard.vue'
@@ -210,6 +211,8 @@ async function dealCards(cardIds, speedMult) {
     await new Promise(resolve => setTimeout(resolve, 60 * i * spd))
     const cardEl = handAreaRef.value?.querySelector(`[data-card-id="${cardIds[i]}"]`)
     if (!cardEl) continue
+    // 每张牌飞入手牌槽时播放 card-deal 音效（PRD §M3，错峰 60ms 由循环本身保证）
+    playSfx('card-deal')
 
     const targetRect = cardEl.getBoundingClientRect()
 
@@ -297,6 +300,8 @@ async function handlePlay() {
   const { cards, hand, baseChips, baseMult, chips, mult, score, triggered } = result
 
   // ---- 步骤 1：选中的牌"飞向出牌区" ----
+  // 出牌动画启动时播放 card-play 音效（PRD §M3）
+  playSfx('card-play')
   // 把选中牌 visibility:hidden，显示克隆飞过去
   const selectedEls = []
   for (const card of cards) {
@@ -384,6 +389,8 @@ async function handlePlay() {
     if (!t) continue
 
     store.jokerTriggeredIndex = i
+    // 每张 Joker 触发时播放 joker-trigger 音效（PRD §M3）
+    playSfx('joker-trigger')
 
     // Joker 上方飞出文字
     const jokerEls = document.querySelectorAll('.joker-card-item')
@@ -415,6 +422,8 @@ async function handlePlay() {
   }
 
   // ---- 步骤 5：公式爆出 ----
+  // chips×mult=score 大字出现时播放 score-explode 音效（PRD §M3）
+  playSfx('score-explode')
   formulaChips.value = chips
   formulaMult.value = mult
   formulaScore.value = score
@@ -450,6 +459,8 @@ async function handlePlay() {
 async function handleDiscard() {
   if (!store.canDiscard) return
   store.animatingPlay = true
+  // 弃牌时播放 discard 音效（PRD §M3）
+  playSfx('discard')
 
   const discarded = store.discardCards()
   await nextTick()
