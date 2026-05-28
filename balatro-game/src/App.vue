@@ -677,11 +677,14 @@ async function handleAiPlay() {
 .deck-layer {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #6b3ec9, #2d0d6e);
+  background-color: #1a0f24;
+  background-image: url('/card-back.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   border: 2px solid #1a0f24;
   border-radius: 8px;
-  background-image:
-    repeating-linear-gradient(45deg, rgba(255,255,255,.03) 0 2px, transparent 2px 6px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .5);
 }
 
 .deck-l3 { transform: translate(-6px, 6px); opacity: .5; }
