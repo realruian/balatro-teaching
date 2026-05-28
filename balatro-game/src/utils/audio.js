@@ -42,19 +42,26 @@ const BGM_SEQ = [
 
 // 创建 AudioContext（必须在用户交互后调用，规避 autoplay 限制）
 function ensureContext() {
-  if (ctx) return ctx
+  if (ctx) {
+    // Safari / Chrome 有时在页面重新获得焦点后会把 context 挂起，统一 resume
+    if (ctx.state === 'suspended') ctx.resume()
+    return ctx
+  }
   const vols = loadSavedVolumes()
   ctx = new (window.AudioContext || window.webkitAudioContext)()
 
-  // BGM 增益（基准 0.35 防爆音，再乘用户音量）
+  // BGM 增益（基准 0.6，再乘用户音量）
   bgmGainNode = ctx.createGain()
-  bgmGainNode.gain.value = vols.bgm * 0.35
+  bgmGainNode.gain.value = vols.bgm * 0.6
   bgmGainNode.connect(ctx.destination)
 
   // SFX 增益
   sfxGainNode = ctx.createGain()
-  sfxGainNode.gain.value = vols.sfx * 0.6
+  sfxGainNode.gain.value = vols.sfx * 0.8
   sfxGainNode.connect(ctx.destination)
+
+  // 部分浏览器 AudioContext 创建后处于 suspended，需显式 resume
+  ctx.resume()
 
   return ctx
 }
@@ -65,12 +72,12 @@ function ensureContext() {
 
 export function setBgmVolume(v) {
   if (!bgmGainNode) return
-  bgmGainNode.gain.setTargetAtTime(v * 0.35, ctx.currentTime, 0.003)
+  bgmGainNode.gain.setTargetAtTime(v * 0.6, ctx.currentTime, 0.003)
 }
 
 export function setSfxVolume(v) {
   if (!sfxGainNode) return
-  sfxGainNode.gain.setTargetAtTime(v * 0.6, ctx.currentTime, 0.003)
+  sfxGainNode.gain.setTargetAtTime(v * 0.8, ctx.currentTime, 0.003)
 }
 
 // ============================================================
