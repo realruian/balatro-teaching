@@ -7,10 +7,12 @@
  * v 的单位与 PRD 一致：0.0–1.0 浮点（slider 值 / 100 后传入）
  */
 
-let ctx = null        // 全局 AudioContext（首次交互后才创建）
-let bgmGainNode = null  // BGM 总增益节点
-let sfxGainNode = null  // SFX 总增益节点
-let bgmStarted = false  // 防止 BGM 重复启动
+let ctx = null            // 全局 AudioContext（首次交互后才创建）
+let bgmGainNode = null    // BGM 总增益节点
+let sfxGainNode = null    // SFX 总增益节点
+let bgmStarted = false    // 防止 BGM 重复启动
+let bgmSourceNode = null  // 真实 mp3 的 AudioBufferSourceNode（用于 stop）
+let bgmBuffer = null      // 预加载的 mp3 buffer
 
 // 从 localStorage 读取已存的音量设置（PRD §1.3：初始化时读回）
 function loadSavedVolumes() {
@@ -85,15 +87,26 @@ export function setSfxVolume(v) {
 // ============================================================
 
 export function playBgm() {
-  if (bgmStarted) return   // 防重复启动
+  if (bgmStarted) return
   bgmStarted = true
   ensureContext()
 
+  if (bgmBuffer) {
+    // 有预加载的真实 mp3，直接循环播放
+    bgmSourceNode = ctx.createBufferSource()
+    bgmSourceNode.buffer = bgmBuffer
+    bgmSourceNode.loop = true
+    bgmSourceNode.connect(bgmGainNode)
+    bgmSourceNode.start(0)
+    return
+  }
+
+  // fallback：程序化合成旋律
   let stepIndex = 0
   let nextTime = ctx.currentTime + 0.05
 
   function scheduleNote() {
-    if (!bgmGainNode) return
+    if (!bgmGainNode || !bgmStarted) return
     const [freq, dur] = BGM_SEQ[stepIndex % BGM_SEQ.length]
     stepIndex++
 
@@ -101,7 +114,6 @@ export function playBgm() {
     osc.type = 'square'
     osc.frequency.value = freq
 
-    // 轻微颤音 LFO
     const lfo = ctx.createOscillator()
     lfo.frequency.value = 5.5
     const lfoGain = ctx.createGain()
@@ -109,7 +121,6 @@ export function playBgm() {
     lfo.connect(lfoGain)
     lfoGain.connect(osc.frequency)
 
-    // 音量包络
     const env = ctx.createGain()
     env.gain.setValueAtTime(0, nextTime)
     env.gain.linearRampToValueAtTime(0.18, nextTime + 0.02)
@@ -125,8 +136,6 @@ export function playBgm() {
     lfo.stop(nextTime + dur + 0.01)
 
     nextTime += dur
-
-    // 提前 0.5s 调度下一个音符，避免卡顿
     const timeToNext = (nextTime - ctx.currentTime - 0.5) * 1000
     setTimeout(scheduleNote, Math.max(0, timeToNext))
   }
@@ -135,8 +144,10 @@ export function playBgm() {
 }
 
 export function stopBgm() {
-  // Web Audio 合成无法精确 stop 调度链，重置 started 标记即可
-  // 若需要真正静音，把 bgmGainNode.gain.value 降到 0
+  if (bgmSourceNode) {
+    try { bgmSourceNode.stop() } catch {}
+    bgmSourceNode = null
+  }
   if (bgmGainNode) bgmGainNode.gain.value = 0
   bgmStarted = false
 }
@@ -276,12 +287,24 @@ export function playSfx(name) {
 // ============================================================
 
 export function initAudio() {
+  // 提前 fetch mp3，存入 bgmBuffer，首次交互时直接播放无延迟
+  fetch('./audio/bgm.mp3')
+    .then(r => r.arrayBuffer())
+    .then(buf => {
+      // AudioContext 可能还未创建，用临时 context decode 后存起来
+      const tmpCtx = new (window.AudioContext || window.AudioContext)()
+      return tmpCtx.decodeAudioData(buf).then(decoded => {
+        bgmBuffer = decoded
+        // 如果用户已经交互、ctx 已建立，tmpCtx 不再需要
+        if (ctx && ctx !== tmpCtx) tmpCtx.close()
+      })
+    })
+    .catch(() => { /* mp3 不可用，静默降级到合成旋律 */ })
+
   // mousedown + touchstart 双重监听，兼容移动端 Safari
   function onFirstInteraction() {
     ensureContext()
     playBgm()
-    document.removeEventListener('mousedown', onFirstInteraction)
-    document.removeEventListener('touchstart', onFirstInteraction)
   }
   document.addEventListener('mousedown', onFirstInteraction, { once: true })
   document.addEventListener('touchstart', onFirstInteraction, { once: true })
